@@ -1,0 +1,176 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Net;
+using System.Net.Sockets;
+using Newtonsoft.Json.Linq;
+using System.IO;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.Reflection.Emit;
+using System.Windows.Forms.DataVisualization.Charting;
+
+namespace chart
+{
+    public partial class Form1 : Form
+    {
+        TcpClient client;
+        int port;
+        string message;
+        int byteCount;
+        NetworkStream stream;
+        byte[] sendData;
+        int hizi;
+        int konum;
+        int s =0;
+        double zaman=0;
+
+
+
+        string saved;
+        string yol = @"C:\Users\Sefa\Desktop\metin_belgesi.txt";
+
+
+
+
+
+        public void mesaj_gonder(string msg, string output)
+        {
+            if (client == null || !client.Connected)
+            {
+                listBox1.Items.Add("bağlantı bulunamadı");
+            }
+            else
+            {
+                NetworkStream stream = client.GetStream();
+                if (stream.CanWrite && stream != null)
+                {
+
+                    string message = msg;
+                    byte[] data = Encoding.ASCII.GetBytes(message);
+                    stream.Write(data, 0, data.Length);
+                    listBox1.Items.Add(output);
+                    
+                }
+
+            }
+        }
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            if (!int.TryParse(textBox2.Text, out port))
+            {
+                MessageBox.Show("port numarası hatalı girildi lütfen integer değer girin!!!");
+                listBox1.Items.Add("port numarası geçersiz");
+            }
+
+            try
+            {
+                client = new TcpClient(textBox1.Text, port);
+                MessageBox.Show("Bağlantı kuruldu");
+                listBox1.Items.Add($"{textBox1.Text} ile bağlantı kuruldu");
+                NetworkStream stream= client.GetStream();
+                string message = "Bilgisayar baglandi";
+                byte[] veri = Encoding.ASCII.GetBytes(message);
+                stream.Write(veri, 0, veri.Length);
+                
+            }
+
+            catch(SocketException)
+            {
+                MessageBox.Show("Bağlantı kurulamadı");
+                listBox1.Items.Add("Bağlantı kurulamadı");
+
+            }
+            
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            mesaj_gonder("baslat", "başlatıldı");
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            mesaj_gonder("durdur", "durduruluyor");
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            mesaj_gonder("geri", "geri çağırılıyor");
+        }
+        int i = 0;
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (client == null || !client.Connected)
+            {
+                return;
+            }
+
+            try
+            {
+                NetworkStream stream = client.GetStream();
+
+                if (stream.DataAvailable)
+                {
+                    byte[] data = new byte[2048];
+                    int bytesRead = stream.Read(data, 0, data.Length);
+                    string receivedData = Encoding.ASCII.GetString(data, 0, bytesRead);
+
+
+
+                    var veriler = JObject.Parse(receivedData);
+
+                    i += 1;
+                    konum = Convert.ToInt32(veriler["konum"]);
+                    hizi = Convert.ToInt32(veriler["hiz"]);
+                    double s = Convert.ToInt32(veriler["sicaklik"]);
+                    zaman += 0.1;
+                    listBox1.Items.Add(veriler["konum"]);
+
+                    Series hiz = chart1.Series["HIZ"];
+                    hiz.Points.AddXY(zaman, hizi);
+                    chart1.ChartAreas[0].AxisX.Title = "zaman";
+                    chart1.ChartAreas[0].AxisY.Title = "hız";
+
+
+                    Series sicak = chart3.Series["SICAKLIK"];
+                    sicak.Points.AddXY(zaman, s);
+                    chart1.ChartAreas[0].AxisX.Title = "zaman";
+                    chart1.ChartAreas[0].AxisY.Title = "C'";
+
+
+                    Series mesafe = chart2.Series["MESAFE"];
+                    mesafe.Points.AddXY( zaman, konum);
+                    chart2.ChartAreas[0].AxisX.Title = "zaman(s)";
+                    chart2.ChartAreas[0].AxisY.Title = "mesafe(m)";
+
+                    using (StreamWriter writer = new StreamWriter(yol, true))
+                    {
+                        writer.WriteLine(receivedData);
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex.Message);
+            }
+        }
+    }
+}
